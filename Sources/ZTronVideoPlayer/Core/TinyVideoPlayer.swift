@@ -236,6 +236,23 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         await switchResourceUrl(resourceUrl, mediaContext: mediaContext)
     }
 
+    
+    public func setRate(_ theRate: Float) {
+        assert(theRate >= 0 && theRate <= 2)
+        
+        guard let currentItem = self.player.currentItem else { return }
+        
+        let taskLock = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            self.player.rate = theRate
+            taskLock.signal()
+        }
+        
+        taskLock.wait()
+        currentItem.audioTimePitchAlgorithm = .timeDomain
+    }
+
+    
     deinit {
         player.replaceCurrentItem(with: nil)
         
@@ -886,12 +903,18 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
      
         - Note: After the seeking operation, the completion closure will be excuted on the main thread.
      */
-    public func seekTo(position: Float, cancelPreviousSeeking: Bool = true, completion: (@Sendable (Bool)-> Void)? = nil) {
+    public func seekTo(position: Float,
+                       cancelPreviousSeeking: Bool = true,
+                       toleranceBefore: CMTime = CMTimeMake(value: 1, timescale: 1),
+                       toleranceAfter: CMTime = CMTimeMake(value: 1, timescale: 1),
+                       completion: (@Sendable (Bool)-> Void)? = nil
+    ) {
         
         if cancelPreviousSeeking {
             player.currentItem?.cancelPendingSeeks()
             isSeeking = false
         }
+        
         
         guard isSeeking == false else {
             completion?(false)

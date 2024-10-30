@@ -40,7 +40,7 @@ public protocol TinyPlayer: Sendable {
     func pause()
     func closeCurrentItem() async /* Stop playing, release the current playing item from memeory. */
     func resetPlayback()
-    func seekTo(position: Float, cancelPreviousSeeking: Bool, completion: (@Sendable (Bool)-> Void)?)
+    func seekTo(position: Float, cancelPreviousSeeking: Bool, toleranceBefore: CMTime, toleranceAfter: CMTime, completion: (@Sendable (Bool)-> Void)?)
     func seekForward(secs: Float, completion: (@Sendable (Bool)-> Void)?)
     func seekBackward(secs: Float, completion: (@Sendable (Bool)-> Void)?)
 }
