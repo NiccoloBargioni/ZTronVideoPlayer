@@ -65,7 +65,7 @@ public protocol TinyVideoPlayerProtocol: TinyPlayer {
     This protocol defines the public delegate methods that TinyPlayer will call in certain conditions.
     All the delegate methods are optional.
  */
-public protocol TinyPlayerDelegate: Sendable {
+public protocol TinyPlayerDelegate: Sendable, AnyObject {
     
     func player(_ player: TinyPlayer, didChangePlaybackStateFromState oldState: TinyPlayerState, toState newState: TinyPlayerState)
     func player(_ player: TinyPlayer, didUpdatePlaybackPosition position: Float, playbackProgress: Float)

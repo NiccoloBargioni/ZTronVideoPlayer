@@ -162,6 +162,13 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
             return false
           }
         }
+
+    
+    public func setDelegate(_ theDelegate: (any MediaRouteManagerDelegate)?) {
+        self.delegateLock.wait()
+        self.delegate = theDelegate
+        self.delegateLock.signal()
+    }
   }
 
 public protocol MediaRouteManagerDelegate: AnyObject, Sendable {
