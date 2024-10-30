@@ -20,17 +20,17 @@ public struct TinyVideoPlayerDefaults {
     /**
         This defines how far the player will seek forwards/backwards when user interacts with buttons in command center.
      */
-    static var seekingInterval: Float = 10.0    // in secs
+    static let seekingInterval: Float = 10.0    // in secs
     
     /**
         This defines how frequently the playing time will be updated.
      */
-    static var timeObservationInterval: Float = 1.0/30    // in secs, 30fps
+    static let timeObservationInterval: Float = 1.0/30    // in secs, 30fps
     
     /**
         This defines how long the player should buffer the content before start playing.
      */
-    static var bufferSize: Float = 6.0      // in secs
+    static let bufferSize: Float = 6.0      // in secs
 }
 
 public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLogging, @unchecked Sendable {    
@@ -73,7 +73,12 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
                 self.endPosition = end
             }
 
-            updateCommandCenterInfo()
+            let taskLock = DispatchSemaphore(value: 0)
+            Task { @MainActor in
+                updateCommandCenterInfo()
+                taskLock.signal()
+            }
+            taskLock.wait()
         }
     }
 
@@ -84,7 +89,12 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
     public var videoDuration: Float? {
         
         didSet {
-            updateCommandCenterInfo()
+            let taskLock = DispatchSemaphore(value: 0)
+            Task { @MainActor in
+                updateCommandCenterInfo()
+                taskLock.signal()
+            }
+            taskLock.wait()
         }
     }
 
@@ -175,13 +185,16 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         
         didSet {
             if hidden {
-                for (_, view) in projectionViewStore {
-                    view.isHidden = true
+                Task { @MainActor in
+                    for (_, view) in projectionViewStore {
+                        view.isHidden = true
+                    }
                 }
-                
             } else {
-                for (_, view) in projectionViewStore {
-                    view.isHidden = false
+                Task { @MainActor in
+                    for (_, view) in projectionViewStore {
+                        view.isHidden = false
+                    }
                 }
             }
         }
@@ -189,7 +202,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
 
 
     // MARK: - Lifecycle management
-
+    @MainActor
     public override init() {
         
         self.player = AVPlayer()
@@ -216,16 +229,15 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         - parameter resourceUrl: The url to the media resource you wish TinyVideoPlayer to play.
         - parameter mediaContext: Specify additional metadata for the to be loaded media item.
      */
-    convenience public init(resourceUrl: URL, mediaContext: MediaContext? = nil) {
-
+    @MainActor
+    convenience public init(resourceUrl: URL, mediaContext: MediaContext? = nil) async {
         self.init()
 
-        switchResourceUrl(resourceUrl, mediaContext: mediaContext)
+        await switchResourceUrl(resourceUrl, mediaContext: mediaContext)
     }
 
     deinit {
-
-        player.pause()
+        player.replaceCurrentItem(with: nil)
         
         detachTimeObserver()
 
@@ -248,11 +260,11 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
      
         Use this method to switch content for TinyVideoPlayer.
      */
-    public func switchResourceUrl(_ resourceUrl: URL, mediaContext: MediaContext? = nil) {
+    public func switchResourceUrl(_ resourceUrl: URL, mediaContext: MediaContext? = nil) async {
         
         if resourceUrl != internalUrl {
             
-            closeCurrentItem()
+            await closeCurrentItem()
 
             internalUrl = resourceUrl
 
@@ -262,8 +274,8 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
             
             let asset = AVURLAsset(url: resourceUrl)
             asset.loadValuesAsynchronously(forKeys: TinyVideoPlayer.assetKeysRequiredForOptimizedPlayback) {
-                DispatchQueue.main.async {
-                    self.setupPlayerWithLoadedAsset(asset: asset)
+                Task.detached(priority: .background) {
+                    await self.setupPlayerWithLoadedAsset(asset: asset)
                 }
             }
             
@@ -277,8 +289,8 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         }
     }
 
+    @MainActor
     fileprivate func setupPlayerWithLoadedAsset(asset: AVAsset) {
-        
         /* Load AVAsset keys asynchronized to optimizing the initial loading behavior (not block the UI). */
         var shouldCancel: Bool = false
         
@@ -310,6 +322,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         
         playerItem = AVPlayerItem(asset: asset)
 
+
         /* iOS 10 optimization for preventing stall at the beginning. */
         if #available(iOS 10.0, tvOS 10.0, *) {
             playerItem!.preferredForwardBufferDuration = TimeInterval(TinyVideoPlayerDefaults.bufferSize)
@@ -340,9 +353,10 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
          Call this method if you want to call switchResourceUrl(:) at a later time to re-use the projection view
          to render another video without re-initializing the whole class.
      */
-    public func closeCurrentItem() {
-        
-        player.pause()
+    public func closeCurrentItem() async {
+        Task { @MainActor in
+            player.pause()
+        }
         
         detachTimeObserver()
         
@@ -362,8 +376,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
             detachObserversFrom(playerItem: currentPlayerItem)
             
             if let videoOutput = playerItemVideoOutput {
-                
-                currentPlayerItem.remove(videoOutput)
+                await currentPlayerItem.remove(videoOutput)
             }
         }
 
@@ -450,11 +463,12 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         }
     }
 
+    @MainActor
     fileprivate func attachObserversOn(player: AVPlayer) {
-        
         player.addObserver(self, forKeyPath: #keyPath(AVPlayer.rate),
                            options: [.new],
                            context: &TinyVideoPlayerAVPlayerObservationContext)
+        
         player.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem),
                            options: [.old, .new],
                            context: &TinyVideoPlayerAVPlayerObservationContext)
@@ -583,13 +597,13 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
                     break
                 }
                 
-            } else if keyPath == #keyPath(AVPlayerItem.playbackLikelyToKeepUp) {
+            } else if keyPath == #keyPath(AVPlayerItem.isPlaybackLikelyToKeepUp) {
                 
                 if playerItem.isPlaybackLikelyToKeepUp {
                     delegate?.playerIsLikelyToKeepUpPlaying(self)
                 }
                 
-            } else if keyPath == #keyPath(AVPlayerItem.playbackBufferEmpty) {
+            } else if keyPath == #keyPath(AVPlayerItem.isPlaybackBufferEmpty) {
                 
                 /*
                     Please note that there are two conditions that can trigger value changes for this property:
@@ -597,8 +611,10 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
                     - Playback for the current video is finished
                     We need to filter out the second case.
                  */
-                if playerItem.isPlaybackBufferEmpty && player.rate > 0 {
-                    updatePlaybackState(.waiting)
+                Task { @MainActor in 
+                    if playerItem.isPlaybackBufferEmpty && player.rate > 0 {
+                        updatePlaybackState(.waiting)
+                    }
                 }
                 
             } else if keyPath == #keyPath(AVPlayerItem.loadedTimeRanges) {
@@ -676,7 +692,12 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
             return
         }
         
-        updateCommandCenterInfo()
+        let taskLock = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            updateCommandCenterInfo()
+            taskLock.signal()
+        }
+        taskLock.wait()
         
         delegate?.player(self, didChangePlaybackStateFromState: playbackState, toState: newState)
         
@@ -713,7 +734,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         delegate?.player(self, didUpdateSeekableRange: 0...videoDuration!)
         
         /* This closure will be executed on the main thread. */
-        let followUpOperations = { (succeed: Bool) in
+        let followUpOperations = { @Sendable (succeed: Bool) in
             
             self.delegate?.playerIsReadyToPlay(self)
             
@@ -748,10 +769,15 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
             return
         }
         
-        if player.rate != 0.0 {
+        let taskCompleted = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            if player.rate != 0.0 {
+                player.rate = 0.0
+            }
             
-            player.rate = 0.0
+            taskCompleted.signal()
         }
+        taskCompleted.wait()
         
         self.currentVideoPlaybackEnded = true
         
@@ -780,7 +806,13 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         /*
             Please note set the rate to 1 doesn't garantee a instant playback.
          */
-        player.rate = 1.0
+        
+        let taskCompletedLock = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            player.rate = 1.0
+            taskCompletedLock.signal()
+        }
+        taskCompletedLock.wait()
         
         /*
             Prefer to use the timeControlStatus property to accurately retrieve player state.
@@ -797,7 +829,13 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
      */
     public func pause() {
         
-        player.rate = 0.0
+        let taskCompletedLock = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            player.rate = 0.0
+            taskCompletedLock.signal()
+        }
+        taskCompletedLock.wait()
+
         
         /*
             Prefer to use the timeControlStatus property to accurately retrieve player state.
@@ -822,8 +860,9 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
         Use this function to let the player consider the current playerItem as a freshly loaded one.
      */
     public func resetPlayback() {
-        
-        player.pause()
+        Task { @MainActor in
+            player.pause()
+        }
         
         /* This is a trick that makes the player switching back to the .ready state possible. */
         playbackState = .unknown
@@ -847,7 +886,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
      
         - Note: After the seeking operation, the completion closure will be excuted on the main thread.
      */
-    public func seekTo(position: Float, cancelPreviousSeeking: Bool = true, completion: ((Bool)-> Void)? = nil) {
+    public func seekTo(position: Float, cancelPreviousSeeking: Bool = true, completion: (@Sendable (Bool)-> Void)? = nil) {
         
         if cancelPreviousSeeking {
             player.currentItem?.cancelPendingSeeks()
@@ -885,7 +924,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
      
         - Note: The seeking behaviour will only be performed inside the valid playable timespan.
      */
-    public func seekForward(secs: Float, completion: ((Bool)-> Void)? = nil) {
+    public func seekForward(secs: Float, completion: (@Sendable (Bool)-> Void)? = nil) {
         
         guard let position = playbackPosition,
             let totalLength = videoDuration,
@@ -904,7 +943,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
 
         - Note: The seeking behaviour will only be performed inside the valid playable timespan.
      */
-    public func seekBackward(secs: Float, completion: ((Bool)-> Void)? = nil) {
+    public func seekBackward(secs: Float, completion: (@Sendable (Bool)-> Void)? = nil) {
         
         guard let position = playbackPosition,
             let totalLength = videoDuration,
@@ -928,7 +967,7 @@ public extension TinyVideoPlayer {
     /*
         Only need to setup once at the initial phase of the TinyVideoPlayer.
      */
-    public func setupCommandCenterTriggers() {
+    func setupCommandCenterTriggers() {
         
         let commandCenter = MPRemoteCommandCenter.shared()
         
@@ -987,7 +1026,13 @@ public extension TinyVideoPlayer {
                 }
             }
             
-            self.player.rate = 1.0
+            let taskLock = DispatchSemaphore(value: 0)
+            Task { @MainActor in
+                self.player.rate = 1.0
+                taskLock.signal()
+            }
+            taskLock.wait()
+            
             return .success
         }
 
@@ -1004,18 +1049,29 @@ public extension TinyVideoPlayer {
                 }
             }
             
-            self.player.rate = 0.0
+            let taskLock = DispatchSemaphore(value: 0)
+            Task { @MainActor in
+                self.player.rate = 0.0
+                taskLock.signal()
+            }
+            taskLock.wait()
+
             return .success
         }
         
-        updateCommandCenterInfo()
+        let taskLock = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            updateCommandCenterInfo()
+            taskLock.signal()
+        }
+        
+        taskLock.wait()
     }
 
     /**
         This function can be called freely at anytime to update the current playing media info in the CommandCenter.
      */
-    public func updateCommandCenterInfo() {
-        
+    @MainActor func updateCommandCenterInfo() {
         var infoDict = [String: Any]()
         
         if let position = self.playbackPosition {
@@ -1087,7 +1143,7 @@ extension TinyVideoPlayer {
          Note:  This view remains under management of TinyVideoPlayer, and when you don't
          need it anymore, make sure you call the recycleVideoProjectView(_:) method to recycle it.
      */
-    public func generateVideoProjectionView() -> TinyVideoProjectionView {
+    @MainActor public func generateVideoProjectionView() -> TinyVideoProjectionView {
         
         let projectionView = TinyVideoProjectionView()
         
@@ -1113,8 +1169,7 @@ extension TinyVideoPlayer {
          Note: You should also remove this view from your view hierachy in order to make sure
          the memory release is successful.
      */
-    public func recycleVideoProjectionView(_ connectedView: TinyVideoProjectionView) {
-        
+    @MainActor public func recycleVideoProjectionView(_ connectedView: TinyVideoProjectionView) {
         connectedView.player = nil
         
         projectionViewStore.removeValue(forKey: connectedView.hashId)

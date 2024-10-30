@@ -35,14 +35,14 @@ public protocol TinyPlayer: Sendable {
     var bufferProgress: Float? { get }
     var willPrettifyPauseStateTransation: Bool { get set }
     
-    func switchResourceUrl(_ resourceUrl: URL, mediaContext: MediaContext?)
+    func switchResourceUrl(_ resourceUrl: URL, mediaContext: MediaContext?) async
     func play()
     func pause()
-    func closeCurrentItem() /* Stop playing, release the current playing item from memeory. */
+    func closeCurrentItem() async /* Stop playing, release the current playing item from memeory. */
     func resetPlayback()
-    func seekTo(position: Float, cancelPreviousSeeking: Bool, completion: ((Bool)-> Void)?)
-    func seekForward(secs: Float, completion: ((Bool)-> Void)?)
-    func seekBackward(secs: Float, completion: ((Bool)-> Void)?)
+    func seekTo(position: Float, cancelPreviousSeeking: Bool, completion: (@Sendable (Bool)-> Void)?)
+    func seekForward(secs: Float, completion: (@Sendable (Bool)-> Void)?)
+    func seekBackward(secs: Float, completion: (@Sendable (Bool)-> Void)?)
 }
 
 /**
@@ -52,13 +52,13 @@ public protocol TinyVideoPlayerProtocol: TinyPlayer {
     
     var hidden: Bool { get set }
 
-    func generateVideoProjectionView() -> TinyVideoProjectionView
-    func recycleVideoProjectionView(_ connectedView: TinyVideoProjectionView)
+    @MainActor func generateVideoProjectionView() -> TinyVideoProjectionView
+    @MainActor func recycleVideoProjectionView(_ connectedView: TinyVideoProjectionView)
     
-    func captureStillImageFromCurrentVideoAssets(forTimes timePoints: [Float]?,
-                                                 completion: @escaping (_ time: Float, _ image: UIImage?) -> Void) throws
+    @MainActor func captureStillImageFromCurrentVideoAssets(forTimes timePoints: [Float]?,
+                                                 completion: @escaping @Sendable (_ time: Float, _ image: UIImage?) -> Void) throws
     func captureStillImageForHLSMediaItem(atTime timepoint: Float?,
-                                          completion: @escaping (_ time: Float, _ image: UIImage?) -> Void)
+                                          completion: @escaping @Sendable (_ time: Float, _ image: UIImage?) -> Void)
 }
 
 /**
@@ -128,27 +128,27 @@ public extension TinyPlayerDelegate {
     - Note: When startPosition and / or endPosition is set, the valid playable timespan for the current video
             will be shorter! And the videoDuration,  playbackPosition and playbackProgress will be affected.
  */
-public struct MediaContext {
+public struct MediaContext: Sendable {
     
-    var videoTitle: String?
-    var artistName: String?
+    let videoTitle: String?
+    let artistName: String?
     
     /**
         Optional. It denotes the desired starting position of the current media.
         Can be used to jump over unwanted video intros.
       */
-    var startPosition: Float?
+    let startPosition: Float?
     
     /**
         Optional. It denotes the desired ending position of the current media.
         Can be used to cut unwanted video ending.
       */
-    var endPosition: Float?
+    let endPosition: Float?
     
     /**
         Optional. If don't specify, the player will take the duration of the playItem.
       */
-    var thumbnailImage: UIImage?
+    let thumbnailImage: UIImage?
     
     public init(videoTitle: String?, artistName: String?, startPosition: Float?,
                 endPosition: Float?, thumbnailImage: UIImage?) {

@@ -29,8 +29,8 @@ extension TinyVideoPlayer {
         Use captureStillImageForHLSMediaItem(:) for HLS videos instead. The completion closure will be called on
         the main thread!
      */
-    public func captureStillImageFromCurrentVideoAssets(forTimes timepoints: [Float]? = nil,
-                                        completion: @escaping (_ time: Float, _ image: UIImage?) -> Void) throws {
+    @MainActor public func captureStillImageFromCurrentVideoAssets(forTimes timepoints: [Float]? = nil,
+                                        completion: @escaping @Sendable (_ time: Float, _ image: UIImage?) -> Void) throws {
         
         /* Won't call the completion when TinyVideoPlayer hasn't loaded any video assets yet. */
         guard let playerItem = playerItem  else {
@@ -72,6 +72,7 @@ extension TinyVideoPlayer {
                 destinations.append(NSValue(time: destinationMediaTime))
             }
         }
+        
         
         let imageGenerator = AVAssetImageGenerator(asset: playerItem.asset)
         imageGenerator.appliesPreferredTrackTransform = true
@@ -125,7 +126,7 @@ extension TinyVideoPlayer {
         of performance. The completion closure will be called on the main thread!
      */
     public func captureStillImageForHLSMediaItem(atTime timepoint: Float? = nil,
-                                                 completion: @escaping (_ time: Float, _ image: UIImage?) -> Void) {
+                                                 completion: @escaping @Sendable (_ time: Float, _ image: UIImage?) -> Void) {
         
         var destination: Float
         
@@ -150,8 +151,7 @@ extension TinyVideoPlayer {
             
             let floatRepresentedTime = Float(CMTimeGetSeconds(aCMTime))
             
-            DispatchQueue.main.async {
-                
+            DispatchQueue.main.async { @Sendable in 
                 completion(floatRepresentedTime, resultImage)
             }
         }
