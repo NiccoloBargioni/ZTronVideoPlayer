@@ -45,7 +45,7 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
 
     public var loggingLevel: TinyLoggingLevel = .info
 
-    @MainActor lazy private var volumnView: MPVolumeView = .init(frame: .zero)
+    @MainActor lazy private var volumeView: MPVolumeView = .init(frame: .zero)
 
     private let delegateLock = DispatchSemaphore(value: 1)
 
@@ -94,9 +94,9 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
 
             Task { @MainActor in
                 self.delegate?.wirelessRouteAvailabilityChanged(
-                  available: self.volumnView.areWirelessRoutesAvailable)
+                  available: self.volumeView.areWirelessRoutesAvailable)
 
-                self.onAvailablityChangeClosure?(self.volumnView.areWirelessRoutesAvailable)
+                self.onAvailablityChangeClosure?(self.volumeView.areWirelessRoutesAvailable)
             }
         })
     }
@@ -110,7 +110,7 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
      */
     public var isAirPlayConnected: Bool {
         get async {
-            let result = await self.volumnView.isWirelessRouteActive
+            let result = await self.volumeView.isWirelessRouteActive
             return result
         }
     }
