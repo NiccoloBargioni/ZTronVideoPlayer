@@ -916,7 +916,7 @@ public final class TinyVideoPlayer: NSObject, TinyVideoPlayerProtocol, TinyLoggi
 
         isSeeking = true
         
-        player.seek(to: timePoint) { completed in
+        player.seek(to: timePoint, toleranceBefore: toleranceBefore, toleranceAfter: toleranceAfter) { completed in
             
             DispatchQueue.main.async { [unowned self]  in
                 self.isSeeking = false
