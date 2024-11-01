@@ -36,8 +36,8 @@ public protocol TinyPlayer: Sendable {
     var willPrettifyPauseStateTransation: Bool { get set }
     
     func switchResourceUrl(_ resourceUrl: URL, mediaContext: MediaContext?) async
-    func play()
-    func pause()
+    @MainActor func play()
+    @MainActor func pause()
     func closeCurrentItem() async /* Stop playing, release the current playing item from memeory. */
     func resetPlayback()
     func seekTo(position: Float, cancelPreviousSeeking: Bool, toleranceBefore: CMTime, toleranceAfter: CMTime, completion: (@Sendable (Bool)-> Void)?)
@@ -66,13 +66,12 @@ public protocol TinyVideoPlayerProtocol: TinyPlayer {
     All the delegate methods are optional.
  */
 public protocol TinyPlayerDelegate: Sendable, AnyObject {
-    
-    func player(_ player: TinyPlayer, didChangePlaybackStateFromState oldState: TinyPlayerState, toState newState: TinyPlayerState)
-    func player(_ player: TinyPlayer, didUpdatePlaybackPosition position: Float, playbackProgress: Float)
-    func player(_ player: TinyPlayer, didUpdateBufferRange range: ClosedRange<Float>)
-    func player(_ player: TinyPlayer, didUpdateSeekableRange range: ClosedRange<Float>)
-    func playerHasFinishedPlayingVideo(_ player: TinyPlayer)
-    func player(_ player: TinyPlayer, didEncounterFailureWithError error: Error)
+    @MainActor func player(_ player: TinyPlayer, didChangePlaybackStateFromState oldState: TinyPlayerState, toState newState: TinyPlayerState)
+    @MainActor func player(_ player: TinyPlayer, didUpdatePlaybackPosition position: Float, playbackProgress: Float)
+    @MainActor func player(_ player: TinyPlayer, didUpdateBufferRange range: ClosedRange<Float>)
+    @MainActor func player(_ player: TinyPlayer, didUpdateSeekableRange range: ClosedRange<Float>)
+    @MainActor func playerHasFinishedPlayingVideo(_ player: TinyPlayer)
+    @MainActor func player(_ player: TinyPlayer, didEncounterFailureWithError error: Error)
 
     /**
         This method gets called when the media asset is successfully initialized
@@ -81,7 +80,7 @@ public protocol TinyPlayerDelegate: Sendable, AnyObject {
         - parameter player: The player that calls this delegate method.
         - Note: At this stage, the player might still need to fill the buffer before starting playback.
      */
-    func playerIsReadyToPlay(_ player: TinyPlayer)
+    @MainActor func playerIsReadyToPlay(_ player: TinyPlayer)
 
     /**
         It gets called when the player thinks it has cached enough data
@@ -89,15 +88,15 @@ public protocol TinyPlayerDelegate: Sendable, AnyObject {
         - parameter player: The player that calls this delegate method.
         - Note: You can determine whether to rely on this method or the playerIsReadyToPlay(:) method to trigger the staring playback behavior.
      */
-    func playerIsLikelyToKeepUpPlaying(_ player: TinyPlayer)
+    @MainActor func playerIsLikelyToKeepUpPlaying(_ player: TinyPlayer)
 
     /*
         The following three are planned for the upcoming AdPlayer component, optional.
         Caution: These methods are not implemented yet, please don't use them!
      */
-    func player(_ player: TinyPlayer, didReceivedAdInjectPositions positions: [Float])
-    func player(_ player: TinyPlayer, didStartAdPlayback adObject: NSObjectProtocol)
-    func player(_ player: TinyPlayer, didFinishedAdPlayback adObject: NSObjectProtocol)
+    @MainActor func player(_ player: TinyPlayer, didReceivedAdInjectPositions positions: [Float])
+    @MainActor func player(_ player: TinyPlayer, didStartAdPlayback adObject: NSObjectProtocol)
+    @MainActor func player(_ player: TinyPlayer, didFinishedAdPlayback adObject: NSObjectProtocol)
 }
 
 /// TODO: Add ads playback support.
@@ -107,18 +106,18 @@ public protocol TinyPlayerDelegate: Sendable, AnyObject {
  */
 public extension TinyPlayerDelegate {
     
-    func player(_ player: TinyPlayer, didChangePlaybackStateFromState oldState: TinyPlayerState, toState newState: TinyPlayerState) { }
-    func player(_ player: TinyPlayer, didUpdatePlaybackPosition position: Float, playbackProgress: Float) { }
-    func player(_ player: TinyPlayer, didUpdateBufferRange range: ClosedRange<Float>) { }
-    func player(_ player: TinyPlayer, didUpdateSeekableRange range: ClosedRange<Float>) { }
-    func playerHasFinishedPlayingVideo(_ player: TinyPlayer) { }
-    func player(_ player: TinyPlayer, didEncounterFailureWithError error: Error) { }
-    func playerIsReadyToPlay(_ player: TinyPlayer) { }
-    func playerIsLikelyToKeepUpPlaying(_ player: TinyPlayer) { }
+    @MainActor func player(_ player: TinyPlayer, didChangePlaybackStateFromState oldState: TinyPlayerState, toState newState: TinyPlayerState) { }
+    @MainActor func player(_ player: TinyPlayer, didUpdatePlaybackPosition position: Float, playbackProgress: Float) { }
+    @MainActor func player(_ player: TinyPlayer, didUpdateBufferRange range: ClosedRange<Float>) { }
+    @MainActor func player(_ player: TinyPlayer, didUpdateSeekableRange range: ClosedRange<Float>) { }
+    @MainActor func playerHasFinishedPlayingVideo(_ player: TinyPlayer) { }
+    @MainActor func player(_ player: TinyPlayer, didEncounterFailureWithError error: Error) { }
+    @MainActor func playerIsReadyToPlay(_ player: TinyPlayer) { }
+    @MainActor func playerIsLikelyToKeepUpPlaying(_ player: TinyPlayer) { }
     
-    func player(_ player: TinyPlayer, didReceivedAdInjectPositions positions: [Float]) { }
-    func player(_ player: TinyPlayer, didStartAdPlayback adObject: NSObjectProtocol) { }
-    func player(_ player: TinyPlayer, didFinishedAdPlayback adObject: NSObjectProtocol) { }
+    @MainActor func player(_ player: TinyPlayer, didReceivedAdInjectPositions positions: [Float]) { }
+    @MainActor func player(_ player: TinyPlayer, didStartAdPlayback adObject: NSObjectProtocol) { }
+    @MainActor func player(_ player: TinyPlayer, didFinishedAdPlayback adObject: NSObjectProtocol) { }
 }
 
 /**

@@ -57,17 +57,17 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
         object: nil,
         queue: OperationQueue.main,
         using: { @Sendable [unowned self] notification in
-            Task {
+            Task(priority: .high) { @MainActor in
                 var newState: MediaRouteState = self.mediaRouteState
 
-                if await self.isAirPlayConnected {
+                if self.isAirPlayConnected {
 
-                  if await self.isAirPlayPlaybackActive {
+                  if self.isAirPlayPlaybackActive {
 
                     newState = .airplayPlayback
                     self.verboseLog("Airplay playback activated!")
 
-                  } else if await self.isAirplayMirroringActive {
+                  } else if self.isAirplayMirroringActive {
 
                     newState = .airplayPlaybackMirroring
                     self.verboseLog("Airplay playback mirroring activated!")
@@ -91,8 +91,7 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
         object: nil,
         queue: OperationQueue.main,
         using: { [unowned self] notification in
-
-            Task { @MainActor in
+            Task(priority: .high) { @MainActor in
                 self.delegate?.wirelessRouteAvailabilityChanged(
                   available: self.volumeView.areWirelessRoutesAvailable)
 
@@ -108,9 +107,9 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
     /**
         This read-only variable tells generally wether the current media playback is routed via Airplay.
      */
-    public var isAirPlayConnected: Bool {
-        get async {
-            let result = await self.volumeView.isWirelessRouteActive
+    @MainActor public var isAirPlayConnected: Bool {
+        get {
+            let result = self.volumeView.isWirelessRouteActive
             return result
         }
     }
@@ -118,13 +117,14 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
     /**
         This read-only variable tells wether the current media playback is routed wirelessly via mirroring mode.
      */
+    @MainActor
     public var isAirplayMirroringActive: Bool {
 
-        get async {
-            if await isAirPlayConnected {
-              let screens = await UIScreen.screens
+        get {
+            if isAirPlayConnected {
+              let screens = UIScreen.screens
               if screens.count > 1 {
-                return await (screens[1].mirrored == UIScreen.main)
+                return (screens[1].mirrored == UIScreen.main)
               }
             }
 
@@ -136,12 +136,10 @@ public final class MediaRouteManager: TinyLogging, @unchecked Sendable {
     /**
         This read-only variable tells wether the current video stream is routed to an Airplay capable device.
      */
+    @MainActor
     public var isAirPlayPlaybackActive: Bool {
-        get async {
-            let lhs = await isAirPlayConnected
-            let rhs = await isAirplayMirroringActive
-            
-            return lhs && rhs
+        get {
+            return isAirPlayConnected && isAirplayMirroringActive
         }
     }
 
